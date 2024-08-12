@@ -1,8 +1,8 @@
-// app/api/auth/signup/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/db";
 import * as argon2 from "argon2";
+
+// Function to call Db and create new user on it with the given details.
 
 export async function POST(req: NextRequest) {
   const { email, password, name, lastname, username } = await req.json();

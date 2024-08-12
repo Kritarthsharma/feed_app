@@ -5,6 +5,7 @@ interface PaginationControlsProps {
   onNextPage: () => void;
 }
 
+// Pagination controls component
 const PaginationControls: React.FC<PaginationControlsProps> = ({
   currentPage,
   totalPages,

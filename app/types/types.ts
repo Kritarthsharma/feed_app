@@ -1,3 +1,5 @@
+// types for Comments and Posts
+
 export interface Comment {
   id: number;
   content: string;

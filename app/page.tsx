@@ -16,12 +16,14 @@ export default function HomePage() {
   const [totalPages, setTotalPages] = useState(1);
   const ws = useRef<WebSocket | null>(null);
 
+  // Checks through session if the user has authenticated then takes him/her to dashboard otherwise to signi/signup page.
   useEffect(() => {
     if (status === "unauthenticated") {
       signIn();
     }
   }, [status]);
 
+  // passing token to websocket server after authentication.
   useEffect(() => {
     if (status === "authenticated") {
       const token = session?.user?.token;
@@ -71,7 +73,7 @@ export default function HomePage() {
 
   const requestPostsPage = (page: number) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
-      const message = JSON.stringify({ type: "getPosts", page, pageSize: 10 });
+      const message = JSON.stringify({ type: "getPosts", page, pageSize: 5 });
       ws.current.send(message);
     }
   };
@@ -149,5 +151,5 @@ export default function HomePage() {
     );
   }
 
-  return null;
+  return <div>Please Signup/SignIn</div>;
 }

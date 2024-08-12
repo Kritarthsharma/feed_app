@@ -6,6 +6,7 @@ interface PostListProps {
   onCreateComment: (postId: number, content: string) => void;
 }
 
+// Contains lists of posts
 const PostList: React.FC<PostListProps> = ({ posts, onCreateComment }) => {
   return (
     <div>

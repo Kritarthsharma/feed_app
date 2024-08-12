@@ -7,6 +7,7 @@ interface CommentSectionProps {
   onCreateComment: (postId: number, content: string) => void;
 }
 
+// Comments UI component
 const CommentSection: React.FC<CommentSectionProps> = ({
   comments,
   postId,
@@ -33,7 +34,14 @@ const CommentSection: React.FC<CommentSectionProps> = ({
             <p className="font-bold">{comment.author.username}</p>
             <p>{comment.content}</p>
             <p className="text-sm text-gray-500">
-              {new Date(comment.createdAt).toLocaleString()}
+              {new Date(comment.createdAt).toLocaleString("en-US", {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "numeric",
+                hour12: true,
+              })}
             </p>
           </div>
         ))

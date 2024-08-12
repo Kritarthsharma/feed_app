@@ -1,5 +1,3 @@
-// app/auth/signup/page.tsx
-
 "use client";
 
 import { useState } from "react";
@@ -7,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
+// SignUp page UI
 export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,6 +18,7 @@ export default function Signup() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Signup function to onboard new users. Takes input from the UI and passes it to the function.
     const res = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
