@@ -3,49 +3,32 @@
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
-
-type Post = {
-  id: number;
-  content: string;
-  author: { username: string };
-  comments: Comment[];
-  createdAt: string;
-};
-
-type Comment = {
-  id: number;
-  content: string;
-  author: { username: string };
-  postId: number;
-  createdAt: string;
-};
+import PostList from "./components/PostList";
+import CreatePost from "./components/CreatePost";
+import PaginationControls from "./components/PaginationControls";
+import { Post } from "./types/types";
 
 export default function HomePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
-  const [content, setContent] = useState("");
-  const [commentContent, setCommentContent] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const ws = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      signIn(); // Redirects to the login page if not authenticated
+      signIn();
     }
   }, [status]);
 
   useEffect(() => {
     if (status === "authenticated") {
       const token = session?.user?.token;
-
-      // Pass the token when establishing the WebSocket connection
       ws.current = new WebSocket(`ws://localhost:8080?token=${token}`);
 
       ws.current.onopen = () => {
-        console.log("Connected to WebSocket server");
-        requestPostsPage(1); // Fetch the first page of posts on load
+        requestPostsPage(1);
       };
 
       ws.current.onmessage = (event) => {
@@ -88,41 +71,31 @@ export default function HomePage() {
 
   const requestPostsPage = (page: number) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
-      const message = JSON.stringify({
-        type: "getPosts",
-        page,
-        pageSize: 10, // Adjust page size as needed
-      });
+      const message = JSON.stringify({ type: "getPosts", page, pageSize: 10 });
       ws.current.send(message);
     }
   };
 
-  const handleCreatePost = () => {
+  const handleCreatePost = (content: string) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
       const message = JSON.stringify({
         type: "createPost",
         content,
-        token: session?.user?.token, // Include the token in the request
+        token: session?.user?.token,
       });
       ws.current.send(message);
-      setContent("");
-    } else {
-      console.error("WebSocket is not open");
     }
   };
 
-  const handleCreateComment = (postId: number) => {
+  const handleCreateComment = (postId: number, content: string) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
       const message = JSON.stringify({
         type: "createComment",
-        content: commentContent,
         postId,
-        token: session?.user?.token, // Include the token in the request
+        content,
+        token: session?.user?.token,
       });
       ws.current.send(message);
-      setCommentContent("");
-    } else {
-      console.error("WebSocket is not open");
     }
   };
 
@@ -161,99 +134,20 @@ export default function HomePage() {
             </button>
           </div>
 
-          {/* New Post Form */}
-          <div className="mb-6">
-            <textarea
-              className="w-full p-2 border border-gray-300 rounded"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="What's on your mind?"
-            />
-            <button
-              className="bg-blue-500 text-white px-4 py-2 rounded mt-2"
-              onClick={handleCreatePost}
-            >
-              Post
-            </button>
-          </div>
+          <CreatePost onCreatePost={handleCreatePost} />
 
-          {/* Posts List */}
-          <div>
-            {posts.map((post) => (
-              <div key={post.id} className="mb-6">
-                <div className="p-4 border border-gray-300 rounded bg-white">
-                  <p className="font-bold">{post.author.username}</p>
-                  <p>{post.content}</p>
-                  <p className="text-sm text-gray-500">
-                    {new Date(post.createdAt).toLocaleString()}
-                  </p>
+          <PostList posts={posts} onCreateComment={handleCreateComment} />
 
-                  {/* Comments Section */}
-                  <div className="mt-4">
-                    <h2 className="font-semibold mb-2">Comments:</h2>
-                    {post.comments && post.comments.length > 0 ? (
-                      post.comments.map((comment) => (
-                        <div
-                          key={comment.id}
-                          className="ml-4 mb-2 p-2 border-l border-gray-300"
-                        >
-                          <p className="font-bold">{comment.author.username}</p>
-                          <p>{comment.content}</p>
-                          <p className="text-sm text-gray-500">
-                            {new Date(comment.createdAt).toLocaleString()}
-                          </p>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="ml-4 text-gray-500">No comments yet.</p>
-                    )}
-
-                    {/* Add Comment */}
-                    <div className="mt-4">
-                      <input
-                        type="text"
-                        className="w-full p-2 border border-gray-300 rounded"
-                        value={commentContent}
-                        onChange={(e) => setCommentContent(e.target.value)}
-                        placeholder="Add a comment"
-                      />
-                      <button
-                        className="bg-green-500 text-white px-4 py-2 rounded mt-2"
-                        onClick={() => handleCreateComment(post.id)}
-                      >
-                        Comment
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Pagination Controls */}
-          <div className="flex justify-between mt-4">
-            <button
-              className="bg-gray-300 text-black px-4 py-2 rounded"
-              onClick={handlePreviousPage}
-              disabled={currentPage === 1}
-            >
-              Previous
-            </button>
-            <span className="text-black">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              className="bg-gray-300 text-black px-4 py-2 rounded"
-              onClick={handleNextPage}
-              disabled={currentPage === totalPages}
-            >
-              Next
-            </button>
-          </div>
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPreviousPage={handlePreviousPage}
+            onNextPage={handleNextPage}
+          />
         </div>
       </div>
     );
   }
 
-  return null; // Return nothing if not authenticated (fallback)
+  return null;
 }
