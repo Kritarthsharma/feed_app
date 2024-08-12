@@ -1,113 +1,259 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:size-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
+import { useSession, signIn, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, useRef } from "react";
+
+type Post = {
+  id: number;
+  content: string;
+  author: { username: string };
+  comments: Comment[];
+  createdAt: string;
+};
+
+type Comment = {
+  id: number;
+  content: string;
+  author: { username: string };
+  postId: number;
+  createdAt: string;
+};
+
+export default function HomePage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [content, setContent] = useState("");
+  const [commentContent, setCommentContent] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const ws = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      signIn(); // Redirects to the login page if not authenticated
+    }
+  }, [status]);
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      const token = session?.user?.token;
+
+      // Pass the token when establishing the WebSocket connection
+      ws.current = new WebSocket(`ws://localhost:8080?token=${token}`);
+
+      ws.current.onopen = () => {
+        console.log("Connected to WebSocket server");
+        requestPostsPage(1); // Fetch the first page of posts on load
+      };
+
+      ws.current.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "postsPage") {
+          setPosts(data.posts);
+          setCurrentPage(data.currentPage);
+          setTotalPages(data.totalPages);
+        }
+
+        if (data.type === "newPost") {
+          setPosts((prev) => [data.post, ...prev]);
+        }
+
+        if (data.type === "newComment") {
+          setPosts((prevPosts) =>
+            prevPosts.map((post) =>
+              post.id === data.comment.postId
+                ? { ...post, comments: [...post.comments, data.comment] }
+                : post
+            )
+          );
+        }
+
+        if (data.type === "error") {
+          alert(data.message);
+        }
+      };
+
+      ws.current.onclose = () => {
+        console.log("Disconnected from WebSocket server");
+      };
+
+      return () => {
+        ws.current?.close();
+      };
+    }
+  }, [status]);
+
+  const requestPostsPage = (page: number) => {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      const message = JSON.stringify({
+        type: "getPosts",
+        page,
+        pageSize: 10, // Adjust page size as needed
+      });
+      ws.current.send(message);
+    }
+  };
+
+  const handleCreatePost = () => {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      const message = JSON.stringify({
+        type: "createPost",
+        content,
+        token: session?.user?.token, // Include the token in the request
+      });
+      ws.current.send(message);
+      setContent("");
+    } else {
+      console.error("WebSocket is not open");
+    }
+  };
+
+  const handleCreateComment = (postId: number) => {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      const message = JSON.stringify({
+        type: "createComment",
+        content: commentContent,
+        postId,
+        token: session?.user?.token, // Include the token in the request
+      });
+      ws.current.send(message);
+      setCommentContent("");
+    } else {
+      console.error("WebSocket is not open");
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      requestPostsPage(currentPage + 1);
+    }
+  };
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      requestPostsPage(currentPage - 1);
+    }
+  };
+
+  const handleLogout = () => {
+    signOut({ callbackUrl: "/auth/login" });
+  };
+
+  if (status === "loading") {
+    return <p>Loading...</p>;
+  }
+
+  if (status === "authenticated") {
+    return (
+      <div className="p-8">
+        <h1 className="text-2xl">Welcome, {session?.user?.name}</h1>
+        <div className="max-w-2xl mx-auto p-4">
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-2xl font-bold">Social Media Feed</h1>
+            <button
+              className="bg-red-500 text-white px-4 py-2 rounded"
+              onClick={handleLogout}
+            >
+              Logout
+            </button>
+          </div>
+
+          {/* New Post Form */}
+          <div className="mb-6">
+            <textarea
+              className="w-full p-2 border border-gray-300 rounded"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="What's on your mind?"
             />
-          </a>
+            <button
+              className="bg-blue-500 text-white px-4 py-2 rounded mt-2"
+              onClick={handleCreatePost}
+            >
+              Post
+            </button>
+          </div>
+
+          {/* Posts List */}
+          <div>
+            {posts.map((post) => (
+              <div key={post.id} className="mb-6">
+                <div className="p-4 border border-gray-300 rounded bg-white">
+                  <p className="font-bold">{post.author.username}</p>
+                  <p>{post.content}</p>
+                  <p className="text-sm text-gray-500">
+                    {new Date(post.createdAt).toLocaleString()}
+                  </p>
+
+                  {/* Comments Section */}
+                  <div className="mt-4">
+                    <h2 className="font-semibold mb-2">Comments:</h2>
+                    {post.comments && post.comments.length > 0 ? (
+                      post.comments.map((comment) => (
+                        <div
+                          key={comment.id}
+                          className="ml-4 mb-2 p-2 border-l border-gray-300"
+                        >
+                          <p className="font-bold">{comment.author.username}</p>
+                          <p>{comment.content}</p>
+                          <p className="text-sm text-gray-500">
+                            {new Date(comment.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="ml-4 text-gray-500">No comments yet.</p>
+                    )}
+
+                    {/* Add Comment */}
+                    <div className="mt-4">
+                      <input
+                        type="text"
+                        className="w-full p-2 border border-gray-300 rounded"
+                        value={commentContent}
+                        onChange={(e) => setCommentContent(e.target.value)}
+                        placeholder="Add a comment"
+                      />
+                      <button
+                        className="bg-green-500 text-white px-4 py-2 rounded mt-2"
+                        onClick={() => handleCreateComment(post.id)}
+                      >
+                        Comment
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Pagination Controls */}
+          <div className="flex justify-between mt-4">
+            <button
+              className="bg-gray-300 text-black px-4 py-2 rounded"
+              onClick={handlePreviousPage}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </button>
+            <span className="text-black">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              className="bg-gray-300 text-black px-4 py-2 rounded"
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
+    );
+  }
 
-      <div className="relative z-[-1] flex place-items-center before:absolute before:h-[300px] before:w-full before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-full after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 sm:before:w-[480px] sm:after:w-[240px] before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:mb-0 lg:w-full lg:max-w-5xl lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Docs{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Learn{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Templates{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Explore starter templates for Next.js.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Deploy{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-balance text-sm opacity-50">
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  );
+  return null; // Return nothing if not authenticated (fallback)
 }
