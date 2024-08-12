@@ -23,6 +23,20 @@ npx prisma migrate dev
 npx prisma db seed
 ```
 
+If you seeded sample data into the database.
+Below are the credentials of the sample users to interact with the UI or Backend calls.
+
+```bash
+Email:- john@example.com
+password:- hashed_password_1
+
+Email:- jane@example.com
+password:- hashed_password_2
+
+Email:- alice@example.com
+password:- hashed_password_3
+```
+
 Third, Run this command at root to start the project
 
 ```bash
