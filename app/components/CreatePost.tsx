@@ -4,6 +4,7 @@ interface CreatePostProps {
   onCreatePost: (content: string) => void;
 }
 
+// Add new Post UI component
 const CreatePost: React.FC<CreatePostProps> = ({ onCreatePost }) => {
   const [content, setContent] = useState("");
 

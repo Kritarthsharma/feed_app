@@ -4,7 +4,7 @@ const prisma = new PrismaClient();
 
 // Fetch paginated posts
 async function fetchPosts(ws, data) {
-  const { page = 1, pageSize = 10 } = data;
+  const { page = 1, pageSize = 5 } = data;
   const posts = await prisma.post.findMany({
     skip: (page - 1) * pageSize,
     take: pageSize,

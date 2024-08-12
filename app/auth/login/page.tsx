@@ -1,5 +1,3 @@
-// app/auth/login/page.tsx
-
 "use client";
 
 import { useState } from "react";
@@ -7,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
+// Login page UI.
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -16,6 +15,7 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // takes the input from the login UI and passes it to the sigin function of Next auth to authenticate.
     const res = await signIn("credentials", {
       email,
       password,
